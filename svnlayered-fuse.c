@@ -70,7 +70,7 @@ static int process_arg(void *data, const char *arg, int key, struct fuse_args *o
                 lstat(cpath, &cstat);
                 if (S_ISREG(cstat.st_mode)) {
                     new->spath = apr_array_make(arp_pool, 1, sizeof(const char*));
-                    *(const char**)apr_array_push(new->spath) = ".";
+                    *(const char**)apr_array_push(new->spath) = new->path;
                 } else {
                     new->spath = NULL;
                 }
@@ -115,8 +115,8 @@ int main(int argc, char *argv[]) {
     param.mount = NULL;
     param.concat = malloc(sizeof(char)*MAXPATHLEN*2);
     const apr_status_t status = apr_initialize();
-    svn_dso_initialize2();
     param.pool = svn_pool_create(NULL);
+    svn_dso_initialize2();
     apr_pool_create(&arp_pool, NULL);
     // SLIST_INIT(&param.rev_dir_names);
     SLIST_INIT(&param.dir_names);

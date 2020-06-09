@@ -118,7 +118,6 @@ int deleted(const char* f) {
     return svn_prop_test(f, "deleted", self()->private_data->pool, "ON", 2);
 }
 
-// FIXME
 int update(struct dirname* np, struct slf_param * param) {
     apr_array_header_t* paths = np->spath;
     apr_array_header_t* result;
@@ -151,7 +150,10 @@ int update_layer(const char* dname, struct slf_param * param) {
     SLIST_FOREACH(np, &(param->dir_names), entries) {
         if (np->spath == NULL) continue;
         if (strcmp(dname, np->path) == 0) {
-            update(np, param);
+            int r = update(np, param);
+            if (r == 0) {
+                return 0;
+            }
         }
     }
     return -ENOENT;
