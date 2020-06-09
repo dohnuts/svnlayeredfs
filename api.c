@@ -63,8 +63,11 @@ void slf_destroy(void *data)
 int slf_getattr(const char *src, struct stat *stbuf)
 {
     int res;
+    LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, src);
+    if ( strncmp("/svnup_", src, 6) == 0 ) return update_layer(src+6, self()->private_data);
+
     const char *path = SPRP(src);
-    LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, path);
+    LOG(LOG_DEBUG, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, path);
     if (path == NULL)
         return -errno;
     res = lstat(path, stbuf);
@@ -188,7 +191,7 @@ gnext:
 int slf_statfs(const char *src, struct statvfs *stbuf)
 {
     int res;
-    const char *path = new_path("/");
+    const char *path = top_layer_path("/");
     LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, path);
     res = statvfs(path, stbuf);
     if (res == -1)
@@ -202,7 +205,7 @@ int slf_open(const char *src, struct fuse_file_info *fi)
     const char *path = SPRP(src);
     LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, path);
     if (path == NULL) {
-        path = new_path(path);
+        path = top_layer_path(path);
     }
     res = open(path, fi->flags);
     if (res == -1)
@@ -218,7 +221,7 @@ int slf_create(const char *src, mode_t mode, struct fuse_file_info *fi)
     const char *path = SPRP(src);
     LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, path);
     if (path == NULL) {
-        path = new_path(path);
+        path = top_layer_path(path);
     }
     res = open(path, fi->flags, mode);
     if (res == -1)
@@ -234,7 +237,7 @@ int slf_mknod(const char *src, mode_t mode, dev_t rdev)
     const char *path = SPRP(src);
     LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, path);
     if (path == NULL) {
-        path = new_path(path);
+        path = top_layer_path(path);
     }
     int dirfd = AT_FDCWD;
     if (S_ISREG(mode)) {
@@ -357,8 +360,8 @@ int slf_truncate(const char *src, off_t offset)
 int slf_unlink(const char *src)
 {
     const char *path = SPRP(src);
-    LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, path);
-    const char *npath = new_path(src);
+    LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, src);
+    const char *npath = top_layer_path(src);
     if (path != npath) {
         return -EPERM;
     }
@@ -373,7 +376,7 @@ int slf_unlink(const char *src)
 int slf_rmdir(const char *src)
 {
     const char *path = SPRP(src);
-    const char *npath = new_path(path);
+    const char *npath = top_layer_path(path);
     LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, npath);
     if (path != npath) {
         return -EPERM;
@@ -390,7 +393,7 @@ int slf_mkdir(const char *src, mode_t mode)
     if ( path != NULL ) {
         return -EEXIST;
     }
-    const char *npath = new_path(src);
+    const char *npath = top_layer_path(src);
     LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, npath);
     int res = mkdir(npath, mode);
     if (res == -1)
@@ -405,14 +408,14 @@ int slf_rename(const char *src, const char *dest)
     if ( path == NULL ) {
         return -ENOENT;
     }
-    const char *npath = new_path(src);
+    const char *npath = top_layer_path(src);
     if (path != npath) {
         return -EPERM;
     }
     LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, npath);
     const char *to = SPRP(dest);
     if (to == NULL) {
-        to = new_path(dest);
+        to = top_layer_path(dest);
     }
     int res = rename(npath, to);
     if (res == -1)
@@ -424,7 +427,7 @@ int slf_utimens(const char *src, const struct timespec tv[2])
 {
     int res;
     const char *path = SPRP(src); //should resolve symlink sometimes @@
-    LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, path);
+    LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, src);
     if (path == NULL)
         return -errno;
 
@@ -463,10 +466,10 @@ int slf_chmod(const char *src, mode_t mode)
 {
     int res;
     const char *path = SPRP(src);
-    LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, path);
+    LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, src);
     if (path == NULL)
         return -errno;
-    const char *npath = new_path(src);
+    const char *npath = top_layer_path(src);
     if (path != npath) {
         return -EPERM;
     }
@@ -482,10 +485,10 @@ int slf_chown(const char *src, uid_t uid, gid_t gid)
 {
     int res;
     const char *path = SPRP(src);
-    LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, path);
+    LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, src);
     if (path == NULL)
         return -errno;
-    const char *npath = new_path(src);
+    const char *npath = top_layer_path(src);
     if (path != npath) {
         return -EPERM;
     }
@@ -538,7 +541,7 @@ int slf_access(const char *src, int mask)
 {
     int res;
     const char *path = SPRP(src);
-    LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, path);
+    LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, src);
     if (path == NULL)
         return -errno;
     res = access(path, mask);
@@ -552,7 +555,7 @@ int slf_readlink(const char *src, char *buf, size_t size)
 {
     int res;
     const char *path = SPRP(src);
-    LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, path);
+    LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, src);
     if (path == NULL)
         return -errno;
 
@@ -568,9 +571,8 @@ int slf_readlink(const char *src, char *buf, size_t size)
 // ln -s /home/below/subbelow /mnt/lnsb ok, ln -s /mnt/subbelow /mnt/lnsb NOK => a FD problem ?
 int slf_symlink(const char *src, const char *to)
 {
-    if (strcmp("svnup",src) ==0 ) return update_layer(to);
-    const char *dest = new_path(to);
-    LOG(LOG_INFO, "%s:%s:%s->%s", __FUNCTION__, self()->private_data->mount, src, dest);
+    LOG(LOG_INFO, "%s:%s:%s->%s", __FUNCTION__, self()->private_data->mount, src, to);
+    const char *dest = top_layer_path(to);
     int res = symlink(src, dest);
     if (res == -1)
         LOG(LOG_INFO, "FAILED %s:%s:%s->%s %d", __FUNCTION__, self()->private_data->mount, src, dest, errno);

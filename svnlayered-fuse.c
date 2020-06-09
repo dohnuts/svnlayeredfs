@@ -4,10 +4,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/param.h>
-
+#include <svn_dso.h>
 
 struct fuse_session *se;
 struct fuse *fuse;
+
+apr_pool_t* arp_pool;
 
 void print_usage() {
     fprintf(stderr, "usage: %s [options] -l/under -lbelow [-l...] <mountpoint>\n\n", PROGRAM);
@@ -57,12 +59,22 @@ static int process_arg(void *data, const char *arg, int key, struct fuse_args *o
         };
         case FUSE_OPT_KEY_NONOPT: {
             if ( layer == 1 ) {
+                char cpath[MAXPATHLEN] = {};
+                struct stat cstat = {};
                 layer = 0;
                 struct dirname* new = malloc(sizeof(struct dirname));
                 new->path = arg;
                 new->len = strnlen(arg, MAXPATHLEN-1);
+                strcat(cpath ,arg);
+                strcat(cpath , "/.svn/wc.db");
+                lstat(cpath, &cstat);
+                if (S_ISREG(cstat.st_mode)) {
+                    new->spath = apr_array_make(arp_pool, 1, sizeof(const char*));
+                    *(const char**)apr_array_push(new->spath) = new->path;
+                } else {
+                    new->spath = NULL;
+                }
                 SLIST_INSERT_HEAD(&(param->dir_names), new, entries);
-                // fprintf(stderr, "%s: %s targett !\n", PROGRAM, SLIST_FIRST(&(param->dir_names))->path); 
                 return DISCARD;
             }
             if (param->mount == NULL) {
@@ -75,7 +87,7 @@ static int process_arg(void *data, const char *arg, int key, struct fuse_args *o
             return KEEP;
         };
         default: {
-            return DISCARD;
+            return KEEP;
         };
     }
 }
@@ -102,15 +114,16 @@ int main(int argc, char *argv[]) {
     param.version = 0;
     param.mount = NULL;
     param.concat = malloc(sizeof(char)*MAXPATHLEN*2);
-
+    const apr_status_t status = apr_initialize();
+    param.pool = svn_pool_create(NULL);
+    svn_dso_initialize2();
+    apr_pool_create(&arp_pool, NULL);
     // SLIST_INIT(&param.rev_dir_names);
     SLIST_INIT(&param.dir_names);
-
     if (fuse_opt_parse(&args, &param, slf_opts, process_arg)) {
         fuse_opt_free_args(&args);
         return 1;
     } 
-    
     // if all work is done inside options parsing...
     if (param.help) {
         // mostly testing
@@ -123,18 +136,12 @@ int main(int argc, char *argv[]) {
         fuse_opt_free_args(&args);
         return 0;
     }
-
-
     openlog(PROGRAM, LOG_PID | LOG_PERROR, LOG_USER);
-
     static struct fuse_operations slf_oper;
     operations(&slf_oper);
-    
     char *mountpoint;
     // this flag ignored because libzip does not supports multithreading
     int multithreaded;
-    int res;
-
     fuse = fuse_setup(args.argc, args.argv, &slf_oper, sizeof(slf_oper), &mountpoint, &multithreaded, &param);
     // fuse_opt_free_args(&args);
     if (fuse == NULL) {
@@ -142,12 +149,18 @@ int main(int argc, char *argv[]) {
     }
     // Don't apply umask, use modes exactly as specified
     umask(0);
-
     se = fuse_get_session(fuse);
     fuse_set_signal_handlers(se);
 
-    res = fuse_loop(fuse);
+#ifdef SVNUPTEST
+    int res = update_layer(strdup("_home_digilan-token"), &param);
+#else
+    int res = fuse_loop(fuse);
+#endif
     fuse_remove_signal_handlers(se);
     fuse_teardown(fuse, mountpoint);
+    svn_pool_destroy (param.pool);
+    apr_pool_destroy (arp_pool);
+    apr_terminate();
     return res;
 }

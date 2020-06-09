@@ -14,10 +14,12 @@
 #include <sys/queue.h>
 #include <fuse.h>
 #include <fuse_opt.h>
+#include <svn_pools.h>
 
 struct dirname {
     const char* path;
     size_t len;
+    apr_array_header_t* spath;
     SLIST_ENTRY(dirname) entries;
 };
 
@@ -35,6 +37,8 @@ struct slf_param {
     const char* mount;
     // buffer
     char* concat;
+    // svn buffers
+    apr_pool_t *        pool;
 };
 
 struct my_fuse_context {
@@ -46,12 +50,7 @@ struct my_fuse_context {
     mode_t              umask;          /* umask of the thread */
 };
 
-inline struct my_fuse_context* self() {
-    struct fuse_context* p= fuse_get_context();
-    return (struct my_fuse_context*)p;
-}
-
-#ifdef DEBUG
+#ifdef LOGS
 #define LOG(lvl, fmt, arg...) syslog(lvl, fmt, ##arg)
 #else
 #define LOG(lvl, fmt, arg...) 
@@ -93,10 +92,12 @@ int slf_readlink(const char *src, char *buf, size_t size);
 int slf_symlink(const char *src, const char *to);
 void operations(struct fuse_operations* slf_oper);
 
-// helper/action
-char * new_path(const char* src);
-int update_layer(const char*);
-const char* source_path_to_real_path(const char* callee , const char* src);
-
+// helper
+struct my_fuse_context* self();
+char * top_layer_path(const char*);
+const char* source_path_to_real_path(const char* src, const char* real);
+// action
+int update_layer(const char*, struct slf_param *);
+int deleted(const char*);
 
 #endif
