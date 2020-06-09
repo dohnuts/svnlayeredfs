@@ -115,15 +115,16 @@ int svn_prop_test(const char* f, const char* pname, apr_pool_t *pool, const char
 }
 
 int deleted(const char* f) {
-    return svn_prop_test(f, "delete", self()->private_data->pool, "ON", 2);
+    return svn_prop_test(f, "deleted", self()->private_data->pool, "ON", 2);
 }
 
-int update(struct dirname* np) {
+// FIXME
+int update(struct dirname* np, struct slf_param * param) {
     apr_array_header_t* paths = np->spath;
     apr_array_header_t* result;
     svn_client_ctx_t *ctx;
-    svn_client_create_context2(&ctx, NULL, self()->private_data->pool);
-    apr_pool_t *scratch_pool = svn_pool_create(self()->private_data->pool);
+    svn_client_create_context2(&ctx, NULL, param->pool);
+    apr_pool_t *scratch_pool = svn_pool_create(param->pool);
 
     svn_error_t * err = svn_client_update4(&result, paths, &HEAD,
                                             svn_depth_infinity, 0,
@@ -133,20 +134,24 @@ int update(struct dirname* np) {
 
     if (err) {
         // svn_strerror(); ??
-        LOG(LOG_ERR, "%s:%s svn up %s, error code %d", "update", self()->private_data->mount, np->path, err->apr_err);
+        LOG(LOG_ERR, "%s:%s svn up %s, error code %d", "update", param->mount, np->path, err->apr_err);
         return -EIO;
     }
     return 0;
 }
 
-int update_layer(const char* dname) {
+int update_layer(const char* dname, struct slf_param * param) {
     struct dirname* np;
-    LOG(LOG_INFO, "update_layer:%s `%s'", self()->private_data->mount, dname);
+    LOG(LOG_INFO, "update_layer:%s `%s'", param->mount, dname);
 
-    SLIST_FOREACH(np, &(self()->private_data->dir_names), entries) {
+    for (char* p = (char*)dname; (p = strchr(p, '_')); ++p) {
+        *p = '/';
+    }
+
+    SLIST_FOREACH(np, &(param->dir_names), entries) {
         if (np->spath == NULL) continue;
         if (strcmp(dname, np->path) == 0) {
-            update(np);
+            update(np, param);
         }
     }
     return -ENOENT;

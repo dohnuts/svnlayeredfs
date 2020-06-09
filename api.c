@@ -64,7 +64,7 @@ int slf_getattr(const char *src, struct stat *stbuf)
 {
     int res;
     LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, src);
-    if ( strncmp("/svnup/", src, 7) == 0 ) return update_layer(src+6);
+    if ( strncmp("/svnup_", src, 6) == 0 ) return update_layer(src+6, self()->private_data);
 
     const char *path = SPRP(src);
     LOG(LOG_DEBUG, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, path);

@@ -151,7 +151,12 @@ int main(int argc, char *argv[]) {
     umask(0);
     se = fuse_get_session(fuse);
     fuse_set_signal_handlers(se);
+
+#ifdef SVNUPTEST
+    int res = update_layer(strdup("_home_digilan-token"), &param);
+#else
     int res = fuse_loop(fuse);
+#endif
     fuse_remove_signal_handlers(se);
     fuse_teardown(fuse, mountpoint);
     svn_pool_destroy (param.pool);

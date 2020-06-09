@@ -97,7 +97,7 @@ struct my_fuse_context* self();
 char * top_layer_path(const char*);
 const char* source_path_to_real_path(const char* src, const char* real);
 // action
-int update_layer(const char*);
+int update_layer(const char*, struct slf_param *);
 int deleted(const char*);
 
 #endif
