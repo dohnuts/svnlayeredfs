@@ -97,7 +97,7 @@ int svn_prop_test(const char* f, const char* pname, apr_pool_t *pool, const char
     for (int i = 0; i < aprops->nelts; i++)
     {
         svn_prop_t item = APR_ARRAY_IDX(aprops, i, svn_prop_t);
-        const char *filename = item.name;
+        // const char *filename = item.name;
         const svn_string_t *propval = item.value;
 
         if ( propval->len != vsize || memcmp(propval->data, value, vsize) ) {

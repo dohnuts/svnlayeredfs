@@ -120,7 +120,6 @@ struct findpath {
 
 int slf_readdir(const char *src, void *buffer, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
 {
-    int res;
     DIR *dp;
     struct dirent *de;
     struct findpath* it, * new;
@@ -237,7 +236,7 @@ int slf_mknod(const char *src, mode_t mode, dev_t rdev)
     const char *path = SPRP(src);
     LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, path);
     if (path == NULL) {
-        path = top_layer_path(path);
+        path = top_layer_path(src);
     }
     int dirfd = AT_FDCWD;
     if (S_ISREG(mode)) {
@@ -359,13 +358,8 @@ int slf_truncate(const char *src, off_t offset)
 
 int slf_unlink(const char *src)
 {
-    const char *path = SPRP(src);
     LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, src);
-    const char *npath = top_layer_path(src);
-    if (path != npath) {
-        return -EPERM;
-    }
-
+    const char *path = top_layer_path(src);
     int res = unlink(path);
     if (res == -1)
         return -errno;
@@ -375,12 +369,8 @@ int slf_unlink(const char *src)
 
 int slf_rmdir(const char *src)
 {
-    const char *path = SPRP(src);
-    const char *npath = top_layer_path(path);
-    LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, npath);
-    if (path != npath) {
-        return -EPERM;
-    }
+    const char *path = top_layer_path(src);
+    LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, path);
     int res = rmdir(path);
     if (res == -1)
         return -errno;
@@ -408,16 +398,16 @@ int slf_rename(const char *src, const char *dest)
     if ( path == NULL ) {
         return -ENOENT;
     }
+    char* src_path = strdup(path);
     const char *npath = top_layer_path(src);
-    if (path != npath) {
+    if (strcmp(path, npath)) {
+        free(src_path);
         return -EPERM;
     }
-    LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, npath);
-    const char *to = SPRP(dest);
-    if (to == NULL) {
-        to = top_layer_path(dest);
-    }
-    int res = rename(npath, to);
+    const char *to = top_layer_path(dest);
+    LOG(LOG_INFO, "%s:%s:%s %s", __FUNCTION__, self()->private_data->mount, src_path, to);
+    int res = rename(src_path, to);
+    free(src_path);
     if (res == -1)
         return -errno;
     return 0;
@@ -470,7 +460,7 @@ int slf_chmod(const char *src, mode_t mode)
     if (path == NULL)
         return -errno;
     const char *npath = top_layer_path(src);
-    if (path != npath) {
+    if (strcmp(path, npath)) {
         return -EPERM;
     }
 
@@ -484,16 +474,9 @@ int slf_chmod(const char *src, mode_t mode)
 int slf_chown(const char *src, uid_t uid, gid_t gid)
 {
     int res;
-    const char *path = SPRP(src);
     LOG(LOG_INFO, "%s:%s:%s", __FUNCTION__, self()->private_data->mount, src);
-    if (path == NULL)
-        return -errno;
     const char *npath = top_layer_path(src);
-    if (path != npath) {
-        return -EPERM;
-    }
-
-    res = chown(path, uid, gid); //should resolve symlink sometimes @@ or use lchmod,,,
+    res = chown(npath, uid, gid); //should resolve symlink sometimes @@ or use lchmod,,,
     if (res == -1)
         return -errno;
 

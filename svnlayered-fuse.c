@@ -114,7 +114,7 @@ int main(int argc, char *argv[]) {
     param.version = 0;
     param.mount = NULL;
     param.concat = malloc(sizeof(char)*MAXPATHLEN*2);
-    const apr_status_t status = apr_initialize();
+    /*const apr_status_t status =*/ apr_initialize();
     param.pool = svn_pool_create(NULL);
     svn_dso_initialize2();
     apr_pool_create(&arp_pool, NULL);
